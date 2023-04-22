@@ -1,0 +1,202 @@
+                              Nagios Install and confugure
+                         =======================================
+
+yum install -y httpd httpd-tools php gcc glibc glibc-common gd gd-devel make net-snmp
+
+useradd nagios
+
+groupadd nagcmd
+
+usermod -G nagcmd nagios
+
+usermod -G nagcmd apache
+
+mkdir /root/nagios
+
+cd /root/nagios
+
+wget https://assets.nagios.com/downloads/nagioscore/releases/nagios-4.4.11.tar.gz
+
+wget https://nagios-plugins.org/download/nagios-plugins-2.4.4.tar.gz
+
+tar -xvf nagios-4.4.11.tar.gz
+
+tar -xvf nagios-plugins-2.4.4.tar.gz
+
+cd nagios-4.4.11/
+
+yum install openssl-devel -y
+
+./configure --with-command-group=nagcmd
+
+make all
+
+make install
+
+make install-init
+
+make install-commandmode
+
+make install-config
+
+vi /usr/local/nagios/etc/objects/contacts.cfg # Add your email address here
+
+make install-webconf
+
+htpasswd -s -c /usr/local/nagios/etc/htpasswd.users nagiosadmin
+
+systemctl start httpd.service 
+
+cd nagios-plugins-2.4.4/
+
+./configure --with-nagios-user=nagios --with-nagios-group=nagios
+
+make
+
+make install
+
+/usr/local/nagios/bin/nagios -v /usr/local/nagios/etc/nagios.cfg
+
+systemctl enable nagios
+systemctl start nagios.service
+
+search browser: ip/nagios
+
+user:nagiosadmin
+pass:centos
+
+
+getenforce
+setenforce 0
+service nagios restart
+
+How to Configure Host groups and Service groups on Nagios Monitoring Tool
+=========================================================================
+
+
+   cd /usr/local/etc/
+   cp nagios.cfg nagios.cfg.bk
+   cd objects/
+   mkdir monitoring
+   cp localhost.cfg monitoring/
+   cd ..
+   [root@node etc]# ls
+   [root@node etc]# vi nagios.cfg
+   35 cfg_file=/usr/local/nagios/etc/objects/monitoring/localhost.cfg
+   [root@node etc]# systemctl restart nagios
+   [root@node etc]# cd objects/
+   [root@node objects]# cd monitoring/
+   [root@node monitoring]# cp localhost.cfg kep.cfg
+   [root@node monitoring]# vi kep.cfg
+        host_name                   kep
+     27     alias                   kep
+     28     address                 192.168.217.130
+     29 }
+     30
+
+     39 # Define an optional hostgroup for Linux machines
+     40
+     41 #define hostgroup {
+     42
+     43 #     hostgroup_name          linux-servers           ; The name of the hostgroup
+     44 #     alias                   Linux Servers           ; Long name of the group
+     45 #     members                 kep               ; Comma separated list of hosts that belong to this group
+     46 #}
+     47
+
+   [root@node monitoring]# cd ../..
+   [root@node etc]# ls
+   cgi.cfg  htpasswd.users  nagios.cfg  nagios.cfg.bk  objects  resource.cfg
+   [root@node etc]# vi nagios.cfg
+     35 cfg_file=/usr/local/nagios/etc/objects/monitoring/localhost.cfg
+     36 cfg_file=/usr/local/nagios/etc/objects/monitoring/kep.cfg
+
+
+   [root@node monitoring]# vi kep.cfg
+    :%s/127.0.0.1/192.168.217.130
+    :%s/localhost/kep
+    #define hostgroup {
+   #     hostgroup_name          linux-servers           ; The name of the hostgroup
+   #     alias                   Linux Servers           ; Long name of the group
+   #     members                 localhost               ; Comma separated list of hosts that belong to this group
+   #}
+
+##Add windows Host Now
+[root@node objects]# cp windows.cfg monitoring/
+[root@node objects]# cd monitoring/
+[root@node monitoring]# mv windows.cfg windowsB01.cfg
+[root@node monitoring]# vi windowsB01.cfg
+:%s/winserver/windowsb01
+:%s/192.168.1.2/169.254.23.26 
+  21 define host {
+     22
+     23     use                     windows-server          ; Inherit default values from a template
+     24     host_name               windowsb01              ; The name we're giving to this host
+     25     alias                   windowsb01              ; A longer name associated with the host
+     26     address                 169.254.23.26            ; IP address of the host
+     27 }
+
+[root@node monitoring]# systemctl restart nagios
+[root@node monitoring]# vi  ../../nagios.cfg
+39 # Definitions for monitoring a Windows machine
+     40 cfg_file=/usr/local/nagios/etc/objects/monitoring/windowsB01.cfg
+[root@node monitoring]# systemctl restart nagios
+
+
+##Add picture on nagios server####
+
+image folder:[root@node etc]# cd /usr/local/nagios/share/images/logos/
+store image using winscp to this folder
+[root@node monitoring]# vi localhost.cfg
+ 21 define host {
+     22
+     23     use                     linux-server            ; Name of host template to use
+     24                                                     ; This host definition will inherit all variables that are defined
+     25                                                     ; in (or inherited by) the linux-server host template definition.
+     26     host_name               localhost
+     27     alias                   localhost
+     28     address                 127.0.0.1
+     29     icon_image              Nagios_logo.png
+     30     statusmap_image         Nagios_logo.png
+     31 }
+     32
+[root@node monitoring]# systemctl restart nagios
+
+
+
+[root@node monitoring]# vi kep.cfg
+
+21 define host {
+     22
+     23     use                     linux-server            ; Name of host template to use
+     24                                                     ; This host definition will inherit all variables that are defined
+     25                                                     ; in (or inherited by) the linux-server host template definition.
+     26     host_name               kep
+     27     alias                   kep
+     28     address                 192.168.217.130
+     29     parents                 localhost
+     30     icon_image              linux.png
+     31     statusmap_image         linux.png
+     32 }
+     33
+
+
+[root@node monitoring]# vi windowsB01.cfg
+
+ 21 define host {
+     22
+     23     use                     windows-server          ; Inherit default values from a template
+     24     host_name               windowsb01              ; The name we're giving to this host
+     25     alias                   windowsb01              ; A longer name associated with the host
+     26     address                 169.254.23.26            ; IP address of the host
+     27     parents                 localhost
+     28     icon_image              windows.png
+     29     statusmap_image         windows.png
+     30 }
+
+
+#####Important Link####
+
+https://www.nagios.org/downloads/nagios-core/thanks/?skip=1
+http://nagios-plugins.org/download/?C=M;O=D
+https://www.linuxhelp.com/
